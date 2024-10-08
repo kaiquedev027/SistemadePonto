@@ -1,0 +1,27 @@
+<!-- sucesso.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ponto Registrado com Sucesso</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
+        <a href="/">Home</a>
+        <a href="/login">Gerenciador de Ponto</a>   
+    </div>
+
+    <div id="main">
+        <span style="font-size:30px;cursor:pointer" onclick="openNav()">⚙️</span>
+    </div>
+    <div class="registrado">
+        <h1>Ponto Registrado com Sucesso!</h1>
+    </div>
+    <div class="registrado">
+        <p><strong>Funcionário:</strong> {{ nome }}</p>
+        <p><strong>Horário do Ponto:</strong> {{ horario }}</p>
+    </div>
+    <script src="static/menu.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Pontos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
+        <a href="/cadastrar">Cadastrar Funcionario</a>
+        <a href="/login">Sair</a>   
+    </div>
+
+    <div id="main">
+        <span style="font-size:30px;cursor:pointer" onclick="openNav()">⚙️</span>
+    </div>
+    <div class="historico">
+        <h1>Histórico de Pontos</h1>
+    </div>
+    <div class="historico">
+        <form id="filter-form" method="GET" action="{{ url_for('historicos') }}">
+            <label for="data">Filtrar por Data:</label>
+            <input type="date" id="data" name="data" required>
+            
+            <!-- Botão de filtrar -->
+            <button type="submit">Filtrar</button>
+            
+            <!-- Botão de gerar relatório -->
+            <button type="button" onclick="gerarRelatorio()">Gerar Relatório</button>
+        </form>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Data e Hora</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registro in registros %}
+                <tr>
+                    <td>{{ registro[0] }}</td>
+                    <td>{{ registro[1] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        // Função para gerar o relatório
+        function gerarRelatorio() {
+            // Obtém a data do campo de data
+            const data = document.getElementById('data').value;
+            
+            // Verifica se a data foi preenchida
+            if (data) {
+                // Redireciona para a rota de gerar relatório com a data
+                window.location.href = `{{ url_for('gerar_relatorio_todos_funcionarios') }}?data=${data}`;
+            } else {
+                alert('Por favor, selecione uma data.');
+            }
+        }
+    </script>
+    <script src="static/menu.js"></script>
+</body>
+</html>
