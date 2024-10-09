@@ -3,9 +3,10 @@ import cv2
 import numpy as np
 import uuid
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for,send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
 from datetime import datetime
 from fpdf import FPDF
+import base64
 
 app = Flask(__name__)
 
@@ -30,7 +31,7 @@ def gerar_relatorio_todos(data=None):
         SELECT nome, horario FROM registros
         ORDER BY horario DESC
         ''')
-
+    
     registros = cursor.fetchall()
     conn.close()
 
@@ -63,7 +64,6 @@ def gerar_relatorio_todos(data=None):
     pdf.output(pdf_file)
 
     return pdf_file
-
 
 # Função para inicializar o banco de dados SQLite
 def init_db():
@@ -145,42 +145,31 @@ def train_model():
     return face_recognizer, label_names
 
 # Função para autenticar o funcionário ao bater o ponto
-def authenticate_employee(face_recognizer, label_names):
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    
-    if not cap.isOpened():
-        print("Erro ao abrir a câmera.")
-        return "Erro ao abrir a câmera."
+def authenticate_employee(image_data):
+    # Decodificar a imagem recebida (image_data)
+    header, encoded = image_data.split(",", 1)
+    image_bytes = base64.b64decode(encoded)
+    np_arr = np.frombuffer(image_bytes, np.uint8)
+    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-    CONFIDENCE_THRESHOLD = 50  # Ajuste a confiança conforme necessário
+    face_recognizer, label_names = train_model()
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("Erro ao capturar o quadro da câmera.")
-            break
+    if face_recognizer is None or label_names is None:
+        return None, None
 
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        detected_faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    detected_faces = face_cascade.detectMultiScale(gray, 1.3, 5)
 
-        for (x, y, w, h) in detected_faces:
-            id_, confidence = face_recognizer.predict(gray[y:y+h, x:x+w])
-            if confidence < CONFIDENCE_THRESHOLD:  # Menor valor indica maior confiança
-                nome_funcionario = label_names[id_]
-                cap.release()
-                cv2.destroyAllWindows()
-                horario = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                registrar_ponto(nome_funcionario, horario)  # Registra no banco de dados
-                return nome_funcionario, horario
+    CONFIDENCE_THRESHOLD = 50  # Ajuste conforme necessário
 
-        cv2.imshow("Autenticando", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    for (x, y, w, h) in detected_faces:
+        id_, confidence = face_recognizer.predict(gray[y:y+h, x:x+w])
+        if confidence < CONFIDENCE_THRESHOLD:
+            nome_funcionario = label_names[id_]
+            horario = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+            registrar_ponto(nome_funcionario, horario)
+            return nome_funcionario, horario
 
-    cap.release()
-    cv2.destroyAllWindows()
     return None, None
 
 # Página principal com botões
@@ -193,62 +182,52 @@ def index():
 def cadastrar():
     if request.method == 'POST':
         nome = request.form['nome']
-        pasta_funcionario = os.path.join(FUNCIONARIOS_DIR, nome)
-        if not os.path.exists(pasta_funcionario):
-            os.makedirs(pasta_funcionario)
-        
-        # Abrir câmera e capturar 50 fotos em cores
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        
-        if not cap.isOpened():
-            print("Erro ao abrir a câmera.")
-            return "Erro ao abrir a câmera."
-
-        count = 0
-        while count < 50:
-            ret, frame = cap.read()
-            if not ret:
-                print("Erro ao capturar o quadro da câmera.")
-                break
-            
-            gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            detected_faces = face_cascade.detectMultiScale(gray_face, 1.05, 3, minSize=(30, 30))
-
-            for (x, y, w, h) in detected_faces:
-                filename = f"{uuid.uuid4()}.jpg"
-                cv2.imwrite(os.path.join(pasta_funcionario, filename), gray_face[y:y+h, x:x+w])  # Salva as imagens em escala de cinza
-                count += 1
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-
-            cv2.imshow("Capturando Rostos", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
-
-        return redirect(url_for('index'))
-
+        return render_template('cadastrar_camera.html', nome=nome)
     return render_template('cadastrar.html')
 
+# Rota para processar imagens enviadas durante o cadastro
+@app.route('/processar_imagem_cadastro', methods=['POST'])
+def processar_imagem_cadastro():
+    nome = request.form['nome']
+    image_data = request.form['image']
+    if not nome or not image_data:
+        return jsonify({'message': 'Dados inválidos.'}), 400
+
+    pasta_funcionario = os.path.join(FUNCIONARIOS_DIR, nome)
+    if not os.path.exists(pasta_funcionario):
+        os.makedirs(pasta_funcionario)
+
+    # Decodificar a imagem recebida
+    header, encoded = image_data.split(",", 1)
+    image_bytes = base64.b64decode(encoded)
+    np_arr = np.frombuffer(image_bytes, np.uint8)
+    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+    # Converter para escala de cinza
+    gray_face = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    detected_faces = face_cascade.detectMultiScale(gray_face, 1.05, 3, minSize=(30, 30))
+
+    for (x, y, w, h) in detected_faces:
+        filename = f"{uuid.uuid4()}.jpg"
+        img_path = os.path.join(pasta_funcionario, filename)
+        cv2.imwrite(img_path, gray_face[y:y+h, x:x+w])  # Salva as imagens em escala de cinza
+
+    return jsonify({'message': 'Imagem recebida com sucesso.'})
+
 # Rota para bater ponto
-@app.route('/bater_ponto', methods=['GET'])
+@app.route('/bater_ponto', methods=['GET', 'POST'])
 def bater_ponto():
-    face_recognizer, label_names = train_model()
-
-    if face_recognizer is None or label_names is None:
-        return "Nenhuma imagem foi encontrada para treinar o modelo. Por favor, cadastre funcionários primeiro."
-
-    nome_funcionario, horario = authenticate_employee(face_recognizer, label_names)
-
-    if nome_funcionario is not None:
-        historico = obter_historico(nome_funcionario)  # Obter histórico de pontos
-        return render_template('sucesso.html', nome=nome_funcionario, horario=horario, historico=historico)
-    else:
-        return "Falha na autenticação. Tente novamente."
-
+    if request.method == 'POST':
+        # Receber a imagem enviada pelo cliente
+        image_data = request.form['image']
+        # Processar a imagem e autenticar o funcionário
+        nome_funcionario, horario = authenticate_employee(image_data)
+        if nome_funcionario:
+            historico = obter_historico(nome_funcionario)  # Obter histórico de pontos
+            return render_template('sucesso.html', nome=nome_funcionario, horario=horario, historico=historico)
+        else:
+            return "Falha na autenticação. Tente novamente."
+    return render_template('bater_ponto.html')
 
 @app.route('/historico', methods=['GET'])
 def historicos():
@@ -274,18 +253,15 @@ def historicos():
 
     return render_template('historico.html', registros=registros)
 
-
 @app.route('/gerar_relatorio_todos', methods=['GET'])
 def gerar_relatorio_todos_funcionarios():
     data = request.args.get('data')  # Obtém a data da query string (se fornecida)
     pdf_file = gerar_relatorio_todos(data)
     return send_file(pdf_file, as_attachment=True)
 
-
 @app.route('/login')
 def login():
     return render_template('login.html')
-
 
 if __name__ == '__main__':
     app.run(debug=True)
