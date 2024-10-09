@@ -8,11 +8,13 @@
     <video id="video" width="640" height="480" autoplay></video>
     <button id="capture">Bater Ponto</button>
     <p id="status"></p>
+   <!-- ... código anterior ... -->
+
     <script>
         const video = document.getElementById('video');
         const captureButton = document.getElementById('capture');
         const statusText = document.getElementById('status');
-
+    
         // Solicita acesso à câmera
         navigator.mediaDevices.getUserMedia({ video: true })
             .then(stream => {
@@ -22,26 +24,29 @@
                 console.error("Erro ao acessar a câmera:", err);
                 alert("Não foi possível acessar a câmera.");
             });
-
+    
         captureButton.addEventListener('click', () => {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            // Obtém a data e hora do dispositivo do usuário
+    
+            // Captura o horário local com offset de fuso horário
             const now = new Date();
-            const clientTime = now.toISOString(); // Horário em UTC
-            // Se preferir o horário local, use:
-            // const clientTime = now.toLocaleString();
-
+            const offsetMinutes = -now.getTimezoneOffset();
+            const sign = offsetMinutes >= 0 ? '+' : '-';
+            const pad = num => String(Math.floor(Math.abs(num))).padStart(2, '0');
+            const hoursOffset = pad(offsetMinutes / 60);
+            const minutesOffset = pad(offsetMinutes % 60);
+            const isoWithOffset = now.toISOString().replace('Z', `${sign}${hoursOffset}:${minutesOffset}`);
+    
             // Envia a imagem e o timestamp para o servidor
             const imageDataURL = canvas.toDataURL('image/jpeg');
             const formData = new FormData();
             formData.append('image', imageDataURL);
-            formData.append('timestamp', clientTime);
-
+            formData.append('timestamp', isoWithOffset);
+    
             fetch('{{ url_for("bater_ponto") }}', {
                 method: 'POST',
                 body: formData
