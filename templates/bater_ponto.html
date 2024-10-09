@@ -19,7 +19,7 @@
                 video.srcObject = stream;
             })
             .catch(err => {
-                console.error("Erro ao acessar a câmera: ", err);
+                console.error("Erro ao acessar a câmera:", err);
                 alert("Não foi possível acessar a câmera.");
             });
 
@@ -30,10 +30,17 @@
             const context = canvas.getContext('2d');
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Envia a imagem para o servidor
+            // Obtém a data e hora do dispositivo do usuário
+            const now = new Date();
+            const clientTime = now.toISOString(); // Horário em UTC
+            // Se preferir o horário local, use:
+            // const clientTime = now.toLocaleString();
+
+            // Envia a imagem e o timestamp para o servidor
             const imageDataURL = canvas.toDataURL('image/jpeg');
             const formData = new FormData();
             formData.append('image', imageDataURL);
+            formData.append('timestamp', clientTime);
 
             fetch('{{ url_for("bater_ponto") }}', {
                 method: 'POST',
