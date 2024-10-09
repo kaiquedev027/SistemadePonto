@@ -121,6 +121,5 @@ li {
         justify-content: center;
     }
  .baterponto{
-      display: grid;
-      justify-content: center;
+      display: flex;
   }
