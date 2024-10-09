@@ -152,7 +152,7 @@ def authenticate_employee(image_data, timestamp):
     np_arr = np.frombuffer(image_bytes, np.uint8)
     frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-     face_recognizer, label_names = train_model()
+    face_recognizer, label_names = train_model()
 
     if face_recognizer is None or label_names is None:
         return None, None
