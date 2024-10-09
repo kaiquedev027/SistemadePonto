@@ -152,7 +152,7 @@ def authenticate_employee(image_data, timestamp):
     np_arr = np.frombuffer(image_bytes, np.uint8)
     frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-    face_recognizer, label_names = train_model()
+     face_recognizer, label_names = train_model()
 
     if face_recognizer is None or label_names is None:
         return None, None
@@ -166,13 +166,18 @@ def authenticate_employee(image_data, timestamp):
         id_, confidence = face_recognizer.predict(gray[y:y+h, x:x+w])
         if confidence < CONFIDENCE_THRESHOLD:
             nome_funcionario = label_names[id_]
-            # Converte o timestamp para o formato desejado
-            horario = datetime.fromisoformat(timestamp).strftime('%d-%m-%Y %H:%M:%S')
+            # Converte o timestamp para o formato desejado, incluindo o fuso horário
+            try:
+                horario = datetime.fromisoformat(timestamp)
+                # Formata o horário para exibição
+                horario = horario.strftime('%d-%m-%Y %H:%M:%S')
+            except ValueError:
+                # Se ocorrer um erro na conversão, usa o horário do servidor
+                horario = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
             registrar_ponto(nome_funcionario, horario)
             return nome_funcionario, horario
 
     return None, None
-
 
 # Página principal com botões
 @app.route('/')
