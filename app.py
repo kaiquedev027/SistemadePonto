@@ -145,7 +145,7 @@ def train_model():
     return face_recognizer, label_names
 
 # Função para autenticar o funcionário ao bater o ponto
-def authenticate_employee(image_data):
+def authenticate_employee(image_data, timestamp):
     # Decodificar a imagem recebida (image_data)
     header, encoded = image_data.split(",", 1)
     image_bytes = base64.b64decode(encoded)
@@ -166,11 +166,13 @@ def authenticate_employee(image_data):
         id_, confidence = face_recognizer.predict(gray[y:y+h, x:x+w])
         if confidence < CONFIDENCE_THRESHOLD:
             nome_funcionario = label_names[id_]
-            horario = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+            # Converte o timestamp para o formato desejado
+            horario = datetime.fromisoformat(timestamp).strftime('%d-%m-%Y %H:%M:%S')
             registrar_ponto(nome_funcionario, horario)
             return nome_funcionario, horario
 
     return None, None
+
 
 # Página principal com botões
 @app.route('/')
@@ -218,16 +220,19 @@ def processar_imagem_cadastro():
 @app.route('/bater_ponto', methods=['GET', 'POST'])
 def bater_ponto():
     if request.method == 'POST':
-        # Receber a imagem enviada pelo cliente
+        # Receber a imagem e o timestamp enviados pelo cliente
         image_data = request.form['image']
+        timestamp = request.form['timestamp']
+
         # Processar a imagem e autenticar o funcionário
-        nome_funcionario, horario = authenticate_employee(image_data)
+        nome_funcionario, horario = authenticate_employee(image_data, timestamp)
         if nome_funcionario:
-            historico = obter_historico(nome_funcionario)  # Obter histórico de pontos
+            historico = obter_historico(nome_funcionario)
             return render_template('sucesso.html', nome=nome_funcionario, horario=horario, historico=historico)
         else:
             return "Falha na autenticação. Tente novamente."
     return render_template('bater_ponto.html')
+
 
 @app.route('/historico', methods=['GET'])
 def historicos():
